@@ -1,0 +1,33 @@
+# Save this in a GitHub repo as .github/workflows/build-wan2gp.yml
+# Repo secrets:
+#   DOCKERHUB_USERNAME
+#   DOCKERHUB_TOKEN   (Docker Hub access token, not your password)
+
+name: build-wan2gp210-cu130
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/wan2gp210:cu130
+          # GitHub-hosted runners have no NVIDIA GPU. Sage must install
+          # from a wheel, not compile. Keep the Dockerfile Sage line as
+          # pip install of a .whl COPY'd into the repo if compile fails.
