@@ -44,6 +44,7 @@ RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
         --index-url https://download.pytorch.org/whl/cu130
 
 WORKDIR /opt/Wan2GP
+
 RUN git clone --depth 1 https://github.com/deepbeepmeep/Wan2GP.git /opt/Wan2GP
 
 RUN python - <<'PY'
@@ -71,31 +72,35 @@ RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --retries 20 --timeout 120 --no-cache-dir -r /opt/Wan2GP/requirements.txt \
     && pip install --no-cache-dir hf_transfer
 
-RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
-    && pip uninstall -y sageattention || true \
-    && git clone --depth 1 https://github.com/thu-ml/SageAttention.git /tmp/SageAttention \
-    && cd /tmp/SageAttention \
-    && unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH \
-    && export CUDA_HOME=/usr/local/cuda-13.0 \
-    && export PATH="$CUDA_HOME/bin:$PATH" \
-    && export TORCH_CUDA_ARCH_LIST="12.0" \
-    && export MAX_JOBS=1 \
-    && python - <<'PY'
+RUN <<'EOS'
+set -e
+source /opt/conda/etc/profile.d/conda.sh
+conda activate wan2gp210
+pip uninstall -y sageattention || true
+git clone --depth 1 https://github.com/thu-ml/SageAttention.git /tmp/SageAttention
+cd /tmp/SageAttention
+unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH
+export CUDA_HOME=/usr/local/cuda-13.0
+export PATH="$CUDA_HOME/bin:$PATH"
+export TORCH_CUDA_ARCH_LIST=12.0
+export MAX_JOBS=1
+python -c "
 import os, sys, runpy
 import torch.utils.cpp_extension as ext
 ext._check_cuda_version = lambda *a, **k: None
-os.chdir("/tmp/SageAttention")
-os.environ["CUDA_HOME"] = "/usr/local/cuda-13.0"
-os.environ["TORCH_CUDA_ARCH_LIST"] = "12.0"
-os.environ["MAX_JOBS"] = "1"
-sys.argv = ["setup.py", "install"]
-runpy.run_path("setup.py", run_name="__main__")
-PY
-    && python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))" \
-    && rm -rf /tmp/SageAttention
+os.chdir('/tmp/SageAttention')
+os.environ['CUDA_HOME'] = '/usr/local/cuda-13.0'
+os.environ['TORCH_CUDA_ARCH_LIST'] = '12.0'
+os.environ['MAX_JOBS'] = '1'
+sys.argv = ['setup.py', 'install']
+runpy.run_path('setup.py', run_name='__main__')
+"
+python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
+rm -rf /tmp/SageAttention
+EOS
 
 ENV WAN2GP_SITE=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages
-ENV LD_LIBRARY_PATH=${WAN2GP_SITE}/nvidia/cu13/lib:${WAN2GP_SITE}/torch/lib
+ENV LD_LIBRARY_PATH=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/nvidia/cu13/lib:/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/torch/lib
 
 RUN echo 'source /opt/conda/etc/profile.d/conda.sh && conda activate wan2gp210' >> /root/.bashrc \
     && echo 'unset CUDA_HOME' >> /root/.bashrc
