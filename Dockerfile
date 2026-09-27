@@ -95,9 +95,9 @@ os.environ['MAX_JOBS'] = '1'
 sys.argv = ['setup.py', 'install']
 runpy.run_path('setup.py', run_name='__main__')
 "
-cd /workspace
-python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
 rm -rf /tmp/SageAttention
+cd /tmp
+python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
 EOS
 
 ENV WAN2GP_SITE=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages
