@@ -95,6 +95,7 @@ os.environ['MAX_JOBS'] = '1'
 sys.argv = ['setup.py', 'install']
 runpy.run_path('setup.py', run_name='__main__')
 "
+cd /workspace
 python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
 rm -rf /tmp/SageAttention
 EOS
