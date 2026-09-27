@@ -16,7 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git wget curl ca-certificates \
         build-essential ninja-build pkg-config \
-        ffmpeg libgl1 libglib2.0-0 \
+        libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ ! -e /usr/local/cuda-13.0 ]; then ln -s /usr/local/cuda /usr/local/cuda-13.0; fi \
@@ -37,6 +37,12 @@ SHELL ["/bin/bash", "-lc"]
 
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && python -m pip install -U pip "setuptools<=75.8.2" ninja packaging
+
+RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
+    && conda install -y -c conda-forge "ffmpeg>=6" \
+    && conda clean -afy \
+    && which ffmpeg \
+    && ffmpeg -version
 
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --no-cache-dir \
