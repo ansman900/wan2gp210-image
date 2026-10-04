@@ -1,4 +1,5 @@
-# Matches setup_wan2gp_5090.sh except models and the GPU-only torch.cuda check.
+# Wan2GP + torch 2.10 cu130 + SageAttention 2 (sm_120) + ffmpeg 6+
+# Models are NOT in this image.
 FROM nvidia/cuda:13.0.1-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -49,9 +50,11 @@ RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
         torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 \
         --index-url https://download.pytorch.org/whl/cu130
 
+# Bump this date to force a fresh Wan2GP clone.
+ARG WAN2GP_REFRESH=2026-10-04
 WORKDIR /opt/Wan2GP
-
-RUN git clone --depth 1 https://github.com/deepbeepmeep/Wan2GP.git /opt/Wan2GP
+RUN git clone --depth 1 https://github.com/deepbeepmeep/Wan2GP.git /opt/Wan2GP \
+    && git -C /opt/Wan2GP log -1 --oneline
 
 RUN python - <<'PY'
 from pathlib import Path
@@ -78,13 +81,17 @@ RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --retries 20 --timeout 120 --no-cache-dir -r /opt/Wan2GP/requirements.txt \
     && pip install --no-cache-dir hf_transfer
 
+# Bump this date to force a fresh SageAttention compile.
+ARG SAGE_REFRESH=2026-10-04
 RUN <<'EOS'
 set -e
 source /opt/conda/etc/profile.d/conda.sh
 conda activate wan2gp210
 pip uninstall -y sageattention || true
+rm -rf /tmp/SageAttention
 git clone --depth 1 https://github.com/thu-ml/SageAttention.git /tmp/SageAttention
 cd /tmp/SageAttention
+git log -1 --oneline
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH
 export CUDA_HOME=/usr/local/cuda-13.0
 export PATH="$CUDA_HOME/bin:$PATH"
@@ -106,7 +113,6 @@ cd /tmp
 python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
 EOS
 
-ENV WAN2GP_SITE=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages
 ENV LD_LIBRARY_PATH=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/nvidia/cu13/lib:/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/torch/lib
 
 RUN echo 'source /opt/conda/etc/profile.d/conda.sh && conda activate wan2gp210' >> /root/.bashrc \
