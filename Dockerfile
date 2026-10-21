@@ -72,7 +72,7 @@ RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
 # WGPKernels for INT8 math (cu130)
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --no-cache-dir \
-        https://github.com/deepbeepmeep/WGPKernels/releases/download/v1.1.2/wgpkernels-1.1.2%2Bcu130-py3-none-linux_x86_64.whl \
+        https://github.com/deepbeepmeep/WGPKernels/releases/download/v1.3.0/wgpkernels-1.3.0%2Bcu130-py3-none-linux_x86_64.whl \
     && python -c "import wgpkernels; print('wgpkernels ok')"
 # Bump this date to force a fresh SageAttention compile.
 ARG SAGE_REFRESH=2026-10-21
