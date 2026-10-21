@@ -1,7 +1,6 @@
-# Wan2GP + torch 2.10 cu130 + SageAttention 2 (sm_120) + ffmpeg 6+
+# Wan2GP + torch 2.10 cu130 + SageAttention 2 (sm_120) + WGPKernels + ffmpeg 6+
 # Models are NOT in this image.
 FROM nvidia/cuda:13.0.1-cudnn-devel-ubuntu22.04
-
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -13,18 +12,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_ENABLE_HF_TRANSFER=1 \
     TORCH_CUDA_ARCH_LIST=12.0 \
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git wget curl ca-certificates \
         build-essential ninja-build pkg-config \
         libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-
 RUN if [ ! -e /usr/local/cuda-13.0 ]; then ln -s /usr/local/cuda /usr/local/cuda-13.0; fi \
     && nvcc --version \
     && test -f /usr/local/cuda/include/cusparse.h \
     && test -f /usr/local/cuda/include/cublas_v2.h
-
 RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
     && bash /tmp/miniconda.sh -b -p ${CONDA_DIR} \
     && rm /tmp/miniconda.sh \
@@ -33,29 +29,23 @@ RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.s
     && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r || true \
     && conda create -y -n wan2gp210 python=3.11.14 \
     && conda clean -afy
-
 SHELL ["/bin/bash", "-lc"]
-
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && python -m pip install -U pip "setuptools<=75.8.2" ninja packaging
-
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && conda install -y -c conda-forge "ffmpeg>=6" \
     && conda clean -afy \
     && which ffmpeg \
     && ffmpeg -version
-
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --no-cache-dir \
         torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 \
         --index-url https://download.pytorch.org/whl/cu130
-
 # Bump this date to force a fresh Wan2GP clone.
-ARG WAN2GP_REFRESH=2026-10-04
+ARG WAN2GP_REFRESH=2026-10-21
 WORKDIR /opt/Wan2GP
 RUN git clone --depth 1 https://github.com/deepbeepmeep/Wan2GP.git /opt/Wan2GP \
     && git -C /opt/Wan2GP log -1 --oneline
-
 RUN python - <<'PY'
 from pathlib import Path
 p = Path("/opt/Wan2GP/wgp.py")
@@ -76,13 +66,16 @@ else:
     p.write_text("".join(out))
     print("patched wgp.py")
 PY
-
 RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
     && pip install --retries 20 --timeout 120 --no-cache-dir -r /opt/Wan2GP/requirements.txt \
     && pip install --no-cache-dir hf_transfer
-
+# WGPKernels for INT8 math (cu130)
+RUN source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate wan2gp210 \
+    && pip install --no-cache-dir \
+        https://github.com/deepbeepmeep/WGPKernels/releases/download/v1.1.2/wgpkernels-1.1.2%2Bcu130-py3-none-linux_x86_64.whl \
+    && python -c "import wgpkernels; print('wgpkernels ok')"
 # Bump this date to force a fresh SageAttention compile.
-ARG SAGE_REFRESH=2026-10-04
+ARG SAGE_REFRESH=2026-10-21
 RUN <<'EOS'
 set -e
 source /opt/conda/etc/profile.d/conda.sh
@@ -112,12 +105,9 @@ rm -rf /tmp/SageAttention
 cd /tmp
 python -c "import sageattention; print('sage ok', getattr(sageattention, '__version__', 'ok'))"
 EOS
-
 ENV LD_LIBRARY_PATH=/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/nvidia/cu13/lib:/opt/conda/envs/wan2gp210/lib/python3.11/site-packages/torch/lib
-
 RUN echo 'source /opt/conda/etc/profile.d/conda.sh && conda activate wan2gp210' >> /root/.bashrc \
     && echo 'unset CUDA_HOME' >> /root/.bashrc
-
 WORKDIR /workspace
 EXPOSE 7860
 CMD ["bash", "-lc", "source /opt/conda/etc/profile.d/conda.sh && conda activate wan2gp210 && unset CUDA_HOME && cd /opt/Wan2GP && python wgp.py --listen --share"]
